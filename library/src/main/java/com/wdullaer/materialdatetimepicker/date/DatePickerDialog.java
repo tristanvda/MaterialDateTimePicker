@@ -125,7 +125,7 @@ public class DatePickerDialog extends DialogFragment implements
     private TextView mSelectedMonthTextView;
     private TextView mSelectedDayTextView;
     private TextView mYearView;
-    private DayPickerView mDayPickerView;
+    private DayPickerGroup mDayPickerView;
     private YearPickerView mYearPickerView;
 
     private int mCurrentView = UNINITIALIZED;
@@ -366,7 +366,7 @@ public class DatePickerDialog extends DialogFragment implements
         mYearView.setOnClickListener(this);
 
         final Activity activity = getActivity();
-        mDayPickerView = new SimpleDayPickerView(activity, this);
+        mDayPickerView = new DayPickerGroup(activity, this);
         mYearPickerView = new YearPickerView(activity, this);
 
         // if theme mode has not been set by java code, check if it is specified in Style.xml
@@ -385,7 +385,6 @@ public class DatePickerDialog extends DialogFragment implements
         view.setBackgroundColor(bgColor);
 
         mAnimator = view.findViewById(R.id.mdtp_animator);
-        mAnimator.setBackgroundColor(bgColor);
         mAnimator.addView(mDayPickerView);
         mAnimator.addView(mYearPickerView);
         mAnimator.setDateMillis(mCalendar.getTimeInMillis());
@@ -401,7 +400,6 @@ public class DatePickerDialog extends DialogFragment implements
         String buttonTypeface = activity.getResources().getString(R.string.mdtp_button_typeface);
         Button okButton = view.findViewById(R.id.mdtp_ok);
         okButton.setOnClickListener(new OnClickListener() {
-
             @Override
             public void onClick(View v) {
                 tryVibrate();

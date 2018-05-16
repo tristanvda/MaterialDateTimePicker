@@ -54,12 +54,9 @@ import java.util.Locale;
 public abstract class MonthView extends View {
 
     protected static int DEFAULT_HEIGHT = 32;
-    protected static int MIN_HEIGHT = 10;
     protected static final int DEFAULT_SELECTED_DAY = -1;
     protected static final int DEFAULT_WEEK_START = Calendar.SUNDAY;
     protected static final int DEFAULT_NUM_DAYS = 7;
-    protected static final int DEFAULT_SHOW_WK_NUM = 0;
-    protected static final int DEFAULT_FOCUS_MONTH = -1;
     protected static final int DEFAULT_NUM_ROWS = 6;
     protected static final int MAX_NUM_ROWS = 6;
 
@@ -75,9 +72,6 @@ public abstract class MonthView extends View {
     protected static int DAY_HIGHLIGHT_CIRCLE_SIZE;
     protected static int DAY_HIGHLIGHT_CIRCLE_MARGIN;
 
-    // used for scaling to the device density
-    protected static float mScale = 0;
-
     protected DatePickerController mController;
 
     // affects the padding on the sides of this view
@@ -92,13 +86,6 @@ public abstract class MonthView extends View {
     protected Paint mMonthDayLabelPaint;
 
     private final StringBuilder mStringBuilder;
-
-    // The Julian day of the first day displayed by this item
-    protected int mFirstJulianDay = -1;
-    // The month of the first day in this week
-    protected int mFirstMonth = -1;
-    // The month of the last day in this week
-    protected int mLastMonth = -1;
 
     protected int mMonth;
 
@@ -119,10 +106,6 @@ public abstract class MonthView extends View {
     protected int mNumDays = DEFAULT_NUM_DAYS;
     // The number of days + a spot for week number if it is displayed
     protected int mNumCells = mNumDays;
-    // The left edge of the selected day
-    protected int mSelectedLeft = -1;
-    // The right edge of the selected day
-    protected int mSelectedRight = -1;
 
     private final Calendar mCalendar;
     protected final Calendar mDayLabelCalendar;
@@ -184,8 +167,9 @@ public abstract class MonthView extends View {
         MONTH_DAY_LABEL_TEXT_SIZE = res.getDimensionPixelSize(R.dimen.mdtp_month_day_label_text_size);
         MONTH_HEADER_SIZE = res.getDimensionPixelOffset(R.dimen.mdtp_month_list_item_header_height);
         MONTH_HEADER_SIZE_V2 = res.getDimensionPixelOffset(R.dimen.mdtp_month_list_item_header_height_v2);
-        DAY_SELECTED_CIRCLE_SIZE = res
-                .getDimensionPixelSize(R.dimen.mdtp_day_number_select_circle_radius);
+        DAY_SELECTED_CIRCLE_SIZE = mController.getVersion() == DatePickerDialog.Version.VERSION_1
+                ? res.getDimensionPixelSize(R.dimen.mdtp_day_number_select_circle_radius)
+                : res.getDimensionPixelSize(R.dimen.mdtp_day_number_select_circle_radius_v2);
         DAY_HIGHLIGHT_CIRCLE_SIZE = res
                 .getDimensionPixelSize(R.dimen.mdtp_day_highlight_circle_radius);
         DAY_HIGHLIGHT_CIRCLE_MARGIN = res
@@ -195,9 +179,13 @@ public abstract class MonthView extends View {
             mRowHeight = (res.getDimensionPixelOffset(R.dimen.mdtp_date_picker_view_animator_height)
                     - getMonthHeaderSize()) / MAX_NUM_ROWS;
         } else {
-            mRowHeight = (res.getDimensionPixelSize(R.dimen.mdtp_date_picker_view_animator_height_v2)
-                    - getMonthHeaderSize()) / MAX_NUM_ROWS;
+            mRowHeight = (res.getDimensionPixelOffset(R.dimen.mdtp_date_picker_view_animator_height_v2)
+                    - getMonthHeaderSize() - MONTH_DAY_LABEL_TEXT_SIZE * 2) / MAX_NUM_ROWS;
         }
+
+        mEdgePadding = mController.getVersion() == DatePickerDialog.Version.VERSION_1
+                ? 0
+                : context.getResources().getDimensionPixelSize(R.dimen.mdtp_date_picker_view_animator_padding_v2);
 
         // Set up accessibility components.
         mTouchHelper = getMonthViewTouchHelper();
@@ -343,6 +331,7 @@ public abstract class MonthView extends View {
         mTouchHelper.invalidateRoot();
     }
 
+    @SuppressWarnings("unused")
     public void setSelectedDay(int day) {
         mSelectedDay = day;
     }
@@ -362,7 +351,7 @@ public abstract class MonthView extends View {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), mRowHeight * mNumRows + getMonthHeaderSize() + 5);
+        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), mRowHeight * mNumRows + getMonthHeaderSize());
     }
 
     @Override
@@ -379,6 +368,28 @@ public abstract class MonthView extends View {
 
     public int getYear() {
         return mYear;
+    }
+
+    /**
+     * @return The height in pixels of a row of day labels
+     */
+    public int getMonthHeight() {
+        int scaleFactor = mController.getVersion() == DatePickerDialog.Version.VERSION_1 ? 2 : 3;
+        return getMonthHeaderSize() - MONTH_DAY_LABEL_TEXT_SIZE * scaleFactor;
+    }
+
+    /**
+     * @return The width in pixels of a day label
+     */
+    public int getCellWidth() {
+        return (mWidth - mEdgePadding * 2) / mNumDays;
+    }
+
+    /**
+     * @return The left / right padding used when calculating day number positions
+     */
+    public int getEdgePadding() {
+        return mEdgePadding;
     }
 
     /**
@@ -406,7 +417,7 @@ public abstract class MonthView extends View {
     }
 
     protected void drawMonthTitle(Canvas canvas) {
-        int x = (mWidth + 2 * mEdgePadding) / 2;
+        int x = mWidth / 2;
         int y = mController.getVersion() == DatePickerDialog.Version.VERSION_1
                 ? (getMonthHeaderSize() - MONTH_DAY_LABEL_TEXT_SIZE) / 2
                 : getMonthHeaderSize() / 2 - MONTH_DAY_LABEL_TEXT_SIZE;
@@ -436,15 +447,16 @@ public abstract class MonthView extends View {
     protected void drawMonthNums(Canvas canvas) {
         int y = (((mRowHeight + MINI_DAY_NUMBER_TEXT_SIZE) / 2) - DAY_SEPARATOR_WIDTH)
                 + getMonthHeaderSize();
-        final float dayWidthHalf = (mWidth - mEdgePadding * 2) / (mNumDays * 2.0f);
+        // TODO: look at the calculations used by the framework picker to properly align this with the buttons
+        final int dayWidthHalf = (mWidth - mEdgePadding * 2) / (mNumDays * 2);
         int j = findDayOffset();
         for (int dayNumber = 1; dayNumber <= mNumCells; dayNumber++) {
-            final int x = (int) ((2 * j + 1) * dayWidthHalf + mEdgePadding);
+            final int x = (2 * j + 1) * dayWidthHalf + mEdgePadding;
 
             int yRelativeToDay = (mRowHeight + MINI_DAY_NUMBER_TEXT_SIZE) / 2 - DAY_SEPARATOR_WIDTH;
 
-            final int startX = (int) (x - dayWidthHalf);
-            final int stopX = (int) (x + dayWidthHalf);
+            final int startX = x - dayWidthHalf;
+            final int stopX = x + dayWidthHalf;
             final int startY = y - yRelativeToDay;
             final int stopY = startY + mRowHeight;
 

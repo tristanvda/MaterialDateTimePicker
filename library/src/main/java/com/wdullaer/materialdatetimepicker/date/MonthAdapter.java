@@ -17,6 +17,7 @@
 package com.wdullaer.materialdatetimepicker.date;
 
 import android.content.Context;
+import android.support.annotation.NonNull;
 import android.support.v7.widget.RecyclerView;
 import android.view.ViewGroup;
 import android.widget.AbsListView.LayoutParams;
@@ -37,7 +38,6 @@ public abstract class MonthAdapter extends RecyclerView.Adapter<MonthViewHolder>
 
     private CalendarDay mSelectedDay;
 
-    protected static int WEEK_7_OVERHANG_HEIGHT = 7;
     protected static final int MONTHS_IN_YEAR = 12;
 
     /**
@@ -141,7 +141,9 @@ public abstract class MonthAdapter extends RecyclerView.Adapter<MonthViewHolder>
         mSelectedDay = new CalendarDay(System.currentTimeMillis(), mController.getTimeZone());
     }
 
-    @Override public MonthViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+    @Override
+    @NonNull
+    public MonthViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
 
         MonthView v = createMonthView(parent.getContext());
         // Set up the new view
@@ -153,7 +155,7 @@ public abstract class MonthAdapter extends RecyclerView.Adapter<MonthViewHolder>
         return new MonthViewHolder(v);
     }
 
-    @Override public void onBindViewHolder(MonthViewHolder holder, int position) {
+    @Override public void onBindViewHolder(@NonNull MonthViewHolder holder, int position) {
         holder.bind(position, mController, mSelectedDay);
     }
 
@@ -168,7 +170,6 @@ public abstract class MonthAdapter extends RecyclerView.Adapter<MonthViewHolder>
         int endMonth = endDate.get(Calendar.YEAR) * MONTHS_IN_YEAR + endDate.get(Calendar.MONTH);
         int startMonth = startDate.get(Calendar.YEAR) * MONTHS_IN_YEAR + startDate.get(Calendar.MONTH);
         return endMonth - startMonth + 1;
-        //return ((mController.getMaxYear() - mController.getMinYear()) + 1) * MONTHS_IN_YEAR;
     }
 
     public abstract MonthView createMonthView(Context context);
